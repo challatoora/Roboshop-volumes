@@ -1,33 +1,66 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Service
 metadata:
-  name: mongodb
+  name: mongodb-headless
   namespace: roboshop
   labels:
     project: roboshop
-    component: mongodb
     tier: db
-
+    component: mongodb
 spec:
-  # modify replicas according to your case
-  replicas: 1
+  clusterIP: None
+  selector:
+    # labels are used as selectors
+    project: roboshop
+    tier: db
+    component: mongodb
+  ports:
+  - protocol: TCP
+    port: 27017 # servie port
+    targetPort: 27017 # container port
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: roboshop
+  labels: 
+    project: roboshop
+    tier: db
+    component: mongodb
+spec:
   selector:
     matchLabels:
       project: roboshop
-      component: mongodb
       tier: db
-   
+      component: mongodb
+  serviceName: "mongodb-headless" # we should attach headless service
+  replicas: 3
+  #replicas: 1 # by default is 1
+  # Pod definition
   template:
     metadata:
       labels:
         project: roboshop
-        component: mongodb
         tier: db
+        component: mongodb
     spec:
       containers:
       - name: mongodb
         image: challatoor/mongodb:1.0.0
-
+        volumeMounts:
+        - name: mongodb
+          mountPath: /data/db
+  # PVC
+  volumeClaimTemplates:
+  - metadata:
+      name: mongodb
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "roboshop-ebs"
+      resources:
+        requests:
+          storage: 1Gi
 ---
 apiVersion: v1
 kind: Service
@@ -35,17 +68,16 @@ metadata:
   name: mongodb
   namespace: roboshop
   labels:
-        project: roboshop
-        component: mongodb
-        tier: db
-  
+    project: roboshop
+    tier: db
+    component: mongodb
 spec:
   selector:
-    #lables
-      project: roboshop
-      component: mongodb
-      tier: db
+    # labels are used as selectors
+    project: roboshop
+    tier: db
+    component: mongodb
   ports:
   - protocol: TCP
-    port: 27017 # service port
+    port: 27017 # servie port
     targetPort: 27017 # container port
